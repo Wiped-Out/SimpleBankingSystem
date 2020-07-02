@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-# Write your code here
 from random import sample
 import sqlite3
 
 
 class BankingSystem:
+
     def __init__(self):
         self.database()
 
@@ -15,7 +15,7 @@ class BankingSystem:
             if choice == '1':
                 self.create_account()
             elif choice == '2':
-                self.login()
+                self.account()
             elif choice == '0':
                 print('Bye!')
                 exit()
@@ -46,6 +46,20 @@ class BankingSystem:
                     (card, pin, balance),
                 )
 
+    def _login(f):
+        def wrapper(*args, **kwargs):
+            try:
+                card: str = input('Enter your card number:\n')
+                PIN: str = input('Enter your PIN:\n')
+                if BankingSystem.check_credentials(card)[0] == PIN:
+                    print('You have successfully logged in!\n')
+                    return f(*args, **kwargs, card=card)
+                else:
+                    print('Wrong card number or PIN\n')
+            except TypeError:
+                print('Wrong card number or PIN\n')
+        return wrapper
+
     @staticmethod
     def check_credentials(card) -> str:
         with sqlite3.connect('card.s3db') as data:
@@ -57,18 +71,6 @@ class BankingSystem:
                 (card,),
             )
             return cursor.fetchone()
-
-    def login(self) -> None:
-        try:
-            card: str = input('Enter your card number:\n')
-            PIN: str = input('Enter your PIN:\n')
-            if self.check_credentials(card)[0] == PIN:
-                print('You have successfully logged in!\n')
-                self.account(card)
-            else:
-                print('Wrong card number or PIN\n')
-        except TypeError:
-            print('Wrong card number or PIN\n')
 
     @staticmethod
     def luhn_algorithm(card_number: str) -> bool:
@@ -140,7 +142,8 @@ class BankingSystem:
                 return cur.fetchone()[0]
         return 'Error.'
 
-    def account(self, card: str) -> None:
+    @_login
+    def account(self, card=None) -> None:
         while True:
             print(
                 '1. Balance\n2. Add income\n3. Do transfer\n4. Close account\n5. Log out\n0. Exit'
@@ -180,4 +183,5 @@ class BankingSystem:
                 print('Unknown option.\n')
 
 
-BankingSystem().menu()
+System = BankingSystem()
+System.menu()
