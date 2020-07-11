@@ -63,8 +63,8 @@ class BankingSystem:
     @staticmethod
     def generate_numbers() -> tuple:
         while True:
-            random_card = ''.join(['400000'] + [str(n) for n in sample(range(9), 9)] + ['7'])
-            random_PIN = ''.join([str(n) for n in sample(range(9), 4)])
+            random_card = ''.join(['400000'] + [str(n) for n in sample(range(10), 9)] + ['7'])
+            random_PIN = ''.join([str(n) for n in sample(range(10), 4)])
             if not BankingSystem.check_credentials(random_card):
                 if BankingSystem.luhn_algorithm(random_card):
                     yield random_card, random_PIN
