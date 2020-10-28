@@ -3,3 +3,4 @@
 /Project/__pycache__
 /Project/.mypy_cache
 card.s3db
+test.py
