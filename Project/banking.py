@@ -1,14 +1,32 @@
 #!/usr/bin/env python3
-from random import sample
+from random import randint
 import sqlite3
+from typing import Callable, Optional, Tuple
 
 
 class BankingSystem:
-
-    def __init__(self):
+    def __init__(self) -> None:
         self.database()
 
+    class Login:
+        """Asks for credentials to the user before letting him access to sensitive info."""
+
+        def __init__(self, f: Callable[['BankingSystem', str], None]) -> None:
+            self.f = f
+
+        def __call__(self):
+            card = input('Enter your card number:\n')
+            PIN: str = input('Enter your PIN:\n')
+            if BankingSystem.check_credentials(card, PIN):
+                print('You have successfully logged in!\n')
+                self.f(BankingSystem, card, PIN)
+                print('You have successfully logged out.\n')
+                return
+            else:
+                print('Wrong card number or PIN\n')
+
     def menu(self) -> None:
+        """Main driver of the program."""
         while True:
             print("1. Create an account\n2. Log into account\n0. Exit")
             choice: str = input()
@@ -23,7 +41,12 @@ class BankingSystem:
                 print('Unknown option.')
 
     @staticmethod
-    def database(card=None, pin=None, balance=None) -> None:
+    def database(
+        card: Optional[str] = None,
+        pin: Optional[str] = None,
+        balance: Optional[int] = None,
+    ) -> None:
+        """Creates a db if no parameters are provided, else creates account."""
         with sqlite3.connect('card.s3db') as data:
             if not card:
                 data.executescript(
@@ -46,31 +69,19 @@ class BankingSystem:
                     (card, pin, balance),
                 )
 
-    def _login(f):
-        def wrapper(*args, **kwargs):
-            try:
-                card: str = input('Enter your card number:\n')
-                PIN: str = input('Enter your PIN:\n')
-                if BankingSystem.check_credentials(card)[0] == PIN:
-                    print('You have successfully logged in!\n')
-                    return f(*args, **kwargs, card=card)
-                else:
-                    print('Wrong card number or PIN\n')
-            except TypeError:
-                print('Wrong card number or PIN\n')
-        return wrapper
-
     @staticmethod
-    def check_credentials(card) -> str:
+    def check_credentials(card: str, pin: str) -> bool:
+        """Gets the credentials of a card on a db"""
         with sqlite3.connect('card.s3db') as data:
             cursor = data.cursor()
             cursor.execute(
                 '''
-            SELECT pin FROM card WHERE number LIKE (?);
+            SELECT pin FROM card WHERE number = (?) and pin = (?);
             ''',
-                (card,),
+                (card, pin),
             )
-            return cursor.fetchone()
+            result = cursor.fetchone()
+            return bool(result)
 
     @staticmethod
     def luhn_algorithm(card_number: str) -> bool:
@@ -83,27 +94,32 @@ class BankingSystem:
         return sum(number) % 10 == 0
 
     @staticmethod
-    def generate_numbers() -> tuple:
+    def generate_numbers() -> Tuple[str, str]:
+        """Generates numbers until it passes the Luhn algorithm"""
         while True:
-            random_card = ''.join(
-                ['400000'] + [str(n) for n in sample(range(9), 9)] + ['7']
-            )
-            random_PIN = ''.join([str(n) for n in sample(range(9), 4)])
-            if not BankingSystem.check_credentials(random_card):
+            random_card = ''.join(['400000'] + [str(randint(0, 9)) for _ in range(11)])
+            random_PIN = ''.join([str(randint(0, 9)) for _ in range(4)])
+            if not BankingSystem.check_credentials(random_card, random_PIN):
                 if BankingSystem.luhn_algorithm(random_card):
-                    yield [random_card, random_PIN]
+                    return random_card, random_PIN
             else:
                 continue
 
     def create_account(self) -> None:
-        card, PIN = next(self.generate_numbers())
+        card, PIN = self.generate_numbers()
         self.database(card, PIN, 0)
         print('\nYour card has been created')
         print(f'Your card number:\n{card}')
         print(f'Your card PIN:\n{PIN}\n')
 
     @staticmethod
-    def get_update(From=None, to=None, amount=None, close=False) -> str:
+    def get_update(
+        From: Optional[str] = None,
+        to: Optional[str] = None,
+        amount: Optional[int] = None,
+        close: Optional[bool] = False,
+    ) -> str:
+        """Gets, updates and deletes entries from the database"""
         with sqlite3.connect('card.s3db') as data:
             cur = data.cursor()
             if From and to:
@@ -142,8 +158,8 @@ class BankingSystem:
                 return cur.fetchone()[0]
         return 'Error.'
 
-    @_login
-    def account(self, card=None) -> None:
+    @Login
+    def account(self, card: Optional[str] = None, pin: Optional[str] = None) -> None:
         while True:
             print(
                 '1. Balance\n2. Add income\n3. Do transfer\n4. Close account\n5. Log out\n0. Exit'
@@ -152,10 +168,10 @@ class BankingSystem:
             if choice == '1':
                 print(f"\nBalance: {self.get_update(card)}\n")
             elif choice == '2':
-                income = int(input('Enter income:\n'))
+                income: int = int(input('Enter income:\n'))
                 print(self.get_update(From=card, amount=income))
             elif choice == '3':
-                to = input('Enter card number:\n')
+                to: str = input('Enter card number:\n')
                 if card == to:
                     print('You can\'t transfer money to the same account!\n')
                 elif not self.luhn_algorithm(to):
@@ -165,8 +181,10 @@ class BankingSystem:
                 elif not self.check_credentials(to):
                     print('Such card does not exist.\n')
                 else:
-                    amount: str = input('Enter how much money you want to transfer:\n')
-                    if int(amount) > self.get_update(card):
+                    amount: int = int(
+                        input('Enter how much money you want to transfer:\n')
+                    )
+                    if amount > int(self.get_update(card)):
                         print('Not enough money!\n')
                         continue
                     print(self.get_update(card, to, amount))
@@ -174,7 +192,6 @@ class BankingSystem:
                 self.get_update(From=card, close=True)
                 return
             elif choice == '5':
-                print('You have successfully logged out.\n')
                 return
             elif choice == '0':
                 print('Bye!')
@@ -183,5 +200,6 @@ class BankingSystem:
                 print('Unknown option.\n')
 
 
-System = BankingSystem()
-System.menu()
+if __name__ == '__main__':
+    System = BankingSystem()
+    System.menu()
